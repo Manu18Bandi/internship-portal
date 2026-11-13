@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Uploads (user-generated certificate files)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# MySQL local data directory (dev convenience)
+.mysql/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build output
+client/dist/
