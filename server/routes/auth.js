@@ -23,8 +23,12 @@ const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const APP_URL = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 const REDIRECT_URI = `${APP_URL}/api/auth/github/callback`;
-const ADMIN_LOGINS = (process.env.ADMIN_GITHUB_LOGINS || 'Manu18Bandi')
-  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const parseList = (s) => (s || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+const ADMIN_LOGINS = parseList(process.env.ADMIN_GITHUB_LOGINS || 'Manu18Bandi');
+// Portal is private: ONLY these GitHub accounts may sign in at all.
+const ALLOWED_LOGINS = parseList(process.env.ALLOWED_GITHUB_LOGINS).length
+  ? parseList(process.env.ALLOWED_GITHUB_LOGINS)
+  : ADMIN_LOGINS;
 
 /** GET /api/auth/status — is OAuth configured? */
 router.get('/auth/status', (_req, res) => {
@@ -77,6 +81,11 @@ if (AUTH_ENABLED) {
     if (!email) {
       const emails = await (await fetch('https://api.github.com/user/emails', { headers: ghHeaders })).json();
       email = Array.isArray(emails) ? (emails.find((e) => e.primary)?.email || emails[0]?.email) : null;
+    }
+
+    // 2b. portal is private — only allow-listed GitHub accounts may sign in
+    if (!ALLOWED_LOGINS.includes(ghUser.login.toLowerCase())) {
+      return res.redirect(`${APP_URL}/login?denied=1`);
     }
 
     // 3. upsert the user (admins by login list)

@@ -333,26 +333,80 @@ tbody tr:hover { background: var(--t-ink-04); }
 
 /* ---------- login ---------- */
 .login-wrap {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(800px 400px at 20% 0%, var(--t-primary-08), transparent),
+    radial-gradient(900px 500px at 15% 0%, var(--t-primary-08), transparent),
+    radial-gradient(700px 400px at 100% 100%, var(--t-ink-04), transparent),
     var(--c-white);
 }
-.login-card {
+.login-split {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 48px;
+  align-items: center;
+  max-width: 980px;
   width: 100%;
-  max-width: 420px;
-  text-align: center;
-  padding: 36px 28px;
 }
-.login-card .logo { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; }
-.login-card .logo span { color: var(--c-primary); }
-.login-card p { color: var(--c-muted); font-size: 14px; margin: 8px 0 24px; }
-.login-card .btn { width: 100%; justify-content: center; padding: 12px; font-size: 15px; }
-.login-card .demo-note { font-size: 12px; color: var(--c-muted); margin-top: 16px; }
+.login-hero .logo { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 18px; }
+.login-hero .logo span { color: var(--c-primary); }
+.login-hero h1 { font-size: 32px; line-height: 1.2; letter-spacing: -0.6px; margin-bottom: 12px; }
+.login-hero > p { color: var(--c-muted); font-size: 15px; max-width: 440px; margin-bottom: 22px; }
+
+.feature-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.feature-list li { display: flex; gap: 12px; align-items: flex-start; }
+.feature-icon {
+  width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--t-primary-08);
+  border-radius: 10px;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.feature-list b { display: block; font-size: 14px; }
+.feature-list small { color: var(--c-muted); font-size: 13px; line-height: 1.45; display: block; max-width: 340px; }
+
+.login-card { padding: 32px 28px; position: relative; }
+.login-card h2 { font-size: 20px; letter-spacing: -0.3px; margin-bottom: 6px; }
+.login-sub { color: var(--c-muted); font-size: 14px; margin: 8px 0 20px; }
+.badge-tag {
+  position: absolute;
+  top: -12px; right: 20px;
+  background: var(--c-primary);
+  color: var(--c-white);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.github-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 13px;
+  font-size: 15px;
+  gap: 10px;
+}
+.notice {
+  background: var(--t-primary-08);
+  border: 1px solid var(--t-primary-15);
+  color: var(--c-ink);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+.login-foot {
+  margin-top: 18px;
+  color: var(--c-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 /* ---------- auth user chip ---------- */
 .user-chip {
@@ -414,6 +468,11 @@ tbody tr:hover { background: var(--t-ink-04); }
   .table-wrap.compact table { min-width: 0; }
 
   .login-card { padding: 28px 20px; }
+
+  /* login: stack hero above card */
+  .login-split { grid-template-columns: 1fr; gap: 28px; }
+  .login-hero h1 { font-size: 25px; }
+  .feature-list small { max-width: none; }
 }
 /* progress tracker */
 .tracker { display: flex; gap: 6px; }
