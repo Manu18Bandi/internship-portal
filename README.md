@@ -38,9 +38,11 @@ Built with **React + Node.js/Express + MySQL**, in a clean 4-color white theme.
 | | mysql2/promise | Connection pool, parameterized queries |
 | | Multer 2 | Certificate file uploads (PDF/JPG/PNG ≤ 5 MB) |
 | | dotenv | Environment-based configuration |
-| **Database** | MySQL-compatible SQL | 8 relational tables, FKs, junction table |
+| **Database** | MySQL-compatible SQL | 8 relational tables + `users` table for auth |
 | | **Local dev:** MySQL 8.4 | `localhost:3306` |
 | | **Production:** TiDB Cloud Serverless | Free, MySQL-compatible, TLS |
+| **Authentication** | GitHub OAuth + JWT (httpOnly cookie) | Sign in with GitHub; roles: student / admin; demo-mode fallback when unconfigured |
+| **Responsive UI** | CSS media queries, off-canvas drawer nav | Mobile-first: phones, tablets, desktops |
 | **Deployment** | Render (free web service) | Hosts API + built frontend as one service |
 | | GitHub Actions (cron `*/5 * * * *`) | Keep-alive pings + visit tracking |
 | | GitHub | Source control, branches, issues, PRs |
@@ -65,6 +67,8 @@ Built with **React + Node.js/Express + MySQL**, in a clean 4-color white theme.
 
 ### System
 - **Keep-alive + visit tracking** — a cron pings every 5 minutes; every ping is stored in the `visits` table (even with 0 visitors) and shown on the Dashboard
+- **GitHub authentication** (activates when OAuth is configured) — "Sign in with GitHub", JWT session cookie, `student`/`admin` roles; admins manage the admin panel, students see only their own data. **Demo mode:** without OAuth configured the app runs open, exactly as before
+- **Fully responsive** — hamburger drawer navigation, collapsing grids, scrollable tables, touch-friendly controls (phones → desktops)
 
 ---
 
@@ -142,7 +146,21 @@ DB_NAME=internship_portal
 PORT=5000
 DB_SSL=                  # 1 when using TiDB Cloud (TLS enforced)
 MAX_UPLOAD_MB=5
+
+# GitHub OAuth (optional — omit to run in demo mode with no login)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+JWT_SECRET=              # any long random string
+APP_URL=http://localhost:3000
+ADMIN_GITHUB_LOGINS=Manu18Bandi
 ```
+
+**GitHub OAuth setup (to enable login):**
+1. GitHub → Settings → Developer settings → OAuth Apps → **New OAuth App**
+2. Homepage URL: your site (e.g. `https://internship-portal-rthh.onrender.com`)
+3. Authorization callback URL: `<your-site>/api/auth/github/callback`
+4. Copy the **Client ID** + **Client Secret** into the server env vars → restart
+5. Apply the auth migration once: `cd server && node migrate-auth.js`
 `.env` is **gitignored** — never commit credentials. To (re)load schema into a remote DB: `node load-schema.js`.
 
 ---
@@ -211,6 +229,9 @@ Success → `{ "data": ... }` · Failure → `{ "error": { "message", "details"?
 | Applications | `GET /applications?status=` · `GET /students/:id/applications` · `POST /applications` · `PATCH /applications/:id/status` · `DELETE /applications/:id` |
 | Certificates | `GET /students/:id/certificates` · `POST /students/:id/certificates` (multipart) · `GET /certificates/:id/file` · `DELETE /certificates/:id` |
 | Visits | `POST /visits/ping?source=cron\|user` · `GET /visits/summary` |
+| Auth | `GET /auth/status` · `GET /auth/github` → GitHub · `GET /auth/github/callback` · `GET /auth/me` · `POST /auth/logout` |
+
+**Role rules (when OAuth is enabled):** students read/write only their own profile, skills, applications, certificates; admins manage companies, internships and application statuses, and can access any student. GitHub logins listed in `ADMIN_GITHUB_LOGINS` (default `Manu18Bandi`) become admins. Demo mode (no OAuth env vars) keeps everything open.
 
 **Error codes:** 400 validation · 404 not found · 409 duplicate · 413 file too large · 500 internal
 
