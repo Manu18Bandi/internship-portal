@@ -15,6 +15,10 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   dateStrings: true, // return DATE/DATETIME as strings (avoids TZ surprises)
+  // TiDB Cloud and other managed MySQL endpoints require TLS
+  ...(String(process.env.DB_SSL) === '1' || /tidbcloud\.com$/i.test(process.env.DB_HOST || '')
+    ? { ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true } }
+    : {}),
 });
 
 /** Runs a query and returns plain row arrays. Throws ApiError(500) on failure. */
