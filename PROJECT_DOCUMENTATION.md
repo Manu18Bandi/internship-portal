@@ -2,6 +2,9 @@
 
 > **Purpose of this file:** If you received this project as a ZIP/repo, this document alone is enough to understand **what the project is, how it was built, how to run it, what was tested, and how security is handled**. A shorter quick-start also exists in [`README.md`](./README.md).
 
+> 🌐 **This project is deployed and live:** https://internship-portal-rthh.onrender.com
+> (Render free tier + TiDB Cloud free database + GitHub Actions keep-alive cron — see §14 "Live Deployment".)
+
 ---
 
 ## Table of Contents
@@ -18,7 +21,8 @@
 11. [Security Measures & Checks](#11-security-measures--checks)
 12. [Known Limitations](#12-known-limitations)
 13. [Troubleshooting / FAQ](#13-troubleshooting--faq)
-14. [Git Workflow Used](#14-git-workflow-used)
+14. [Live Deployment (Render + TiDB Cloud + Keep-Alive Cron)](#14-live-deployment-render--tidb-cloud--keep-alive-cron)
+15. [Git Workflow Used](#15-git-workflow-used)
 
 ---
 
@@ -51,7 +55,8 @@ This project implements that system as a **three-tier web application**:
 | DB driver | **mysql2/promise** (connection pool) | Parameterized queries → SQL-injection safe |
 | Uploads | **Multer 2.x** | Multipart file handling with type/size limits |
 | Config | **dotenv** | Credentials kept out of code (`.env`, gitignored) |
-| Database | **MySQL 8.4** | Relational data with foreign keys (course requirement) |
+| Database | **MySQL 8.4** (local dev) · **TiDB Cloud Serverless** (production, TLS) | Relational data with foreign keys; free cloud DB for the live deployment |
+| Hosting | **Render** free web service + **GitHub Actions** cron | Serves API + built frontend; 5-min keep-alive pings (see §14) |
 | Testing | Node built-in `fetch` (API), Chromium browser session (UI/E2E) | No extra deps needed for the checks performed |
 
 ---
@@ -62,11 +67,15 @@ This project implements that system as a **three-tier web application**:
 Manoj/
 ├── README.md                    # Quick start + API documentation
 ├── PROJECT_DOCUMENTATION.md     # ← this file (full walkthrough)
+├── render.yaml                  # Render deployment blueprint
+├── package.json                 # monorepo scripts (build → install both + build client)
+├── .github/workflows/keep-alive.yml   # 5-minute keep-alive cron (uses repo var RENDER_URL)
 ├── .gitignore                   # node_modules, .env, uploads/, build output
 │
 ├── server/                      # ===== BACKEND (Express + MySQL) =====
 │   ├── index.js                 # App entry: middleware, route mounting, error handling
-│   ├── schema.sql               # Creates DB + 7 tables + seed data (idempotent: DROP+CREATE)
+│   ├── schema.sql               # Creates DB + 8 tables + seed data (idempotent: DROP+CREATE)
+│   ├── load-schema.js           # Loads schema.sql into any configured DB (TLS-safe for TiDB)
 │   ├── .env                     # DB credentials & port (gitignored — see §4)
 │   ├── package.json
 │   ├── config/
@@ -233,6 +242,8 @@ Both were caught by the API test pass in phase 5, not by chance at demo time —
 - ✅ Centralized JSON error shape `{ error: { message, details? } }` across the API
 - ✅ Toast feedback on every mutation; loading states; empty states
 - ✅ All data fetching via `useEffect` + Axios; all forms controlled with a single `onChange` handler
+- ✅ **Visit tracking + keep-alive** — every page load records a `user` visit; an external cron records a `cron` ping every 5 minutes (even with 0 users); totals shown on the Dashboard "Site activity" card
+- ✅ **Deployed to production** — single Render web service serving API + built frontend (see §14)
 
 ---
 
@@ -241,7 +252,8 @@ Both were caught by the API test pass in phase 5, not by chance at demo time —
 ```
 students ──┬──< student_skills >── skills        (M:N with proficiency)
            ├──< applications >── internships >── companies
-           └──< certificates
+           ├──< certificates
+           └──< visits (keep-alive pings + user visits)
 ```
 
 | Table | Key columns | Constraints of note |
@@ -253,6 +265,7 @@ students ──┬──< student_skills >── skills        (M:N with profici
 | `student_skills` | student_id + skill_id | **composite PK** (prevents duplicate skill), proficiency ENUM |
 | `applications` | student_id FK, internship_id FK, status ENUM | `UNIQUE (student_id, internship_id)` — DB-level duplicate-apply protection; `ON UPDATE CURRENT_TIMESTAMP` |
 | `certificates` | student_id FK, title, issuer, issue_date, file_path | file_path nullable (metadata-only certs allowed) |
+| `visits` | source ENUM('cron','user'), visited_at | one row per keep-alive ping / user visit — complete uptime record |
 
 ---
 
@@ -269,6 +282,7 @@ Base URL `http://localhost:5000/api` — success `{ "data": ... }`, failure `{ "
 | Internships | `GET /internships?domain=&search=&open=`, `GET /internships/domains`, `GET/POST/PUT/DELETE /internships/:id` |
 | Applications | `GET /applications?status=`, `GET /students/:id/applications`, `POST /applications`, `PATCH /applications/:id/status`, `DELETE /applications/:id` |
 | Certificates | `GET /students/:id/certificates`, `POST /students/:id/certificates` (multipart), `GET /certificates/:id/file`, `DELETE /certificates/:id` |
+| Visits | `POST /visits/ping?source=cron\|user` (records a visit; never fails the keep-alive), `GET /visits/summary` (totals + last ping) |
 
 Full request/response examples: [`README.md`](./README.md#api-documentation).
 
@@ -311,7 +325,20 @@ All checks below were **actually executed** against the running system during de
 | Console health | Read console after every page | ✅ **zero errors** across the entire session (only React DevTools/router info notices) |
 | Visual check | Screenshots of Dashboard & Browse | ✅ 4-color white theme renders as designed |
 
-### 10.3 How you can re-run the checks yourself
+### 10.3 Live deployment verification (executed against https://internship-portal-rthh.onrender.com)
+
+| Check | Expected | Result |
+|---|---|---|
+| `GET /api/health` (prod) | 200 `{status:"ok"}` | ✅ |
+| `GET /api/students/1` (prod, TiDB over TLS) | 200 — full profile + skills | ✅ |
+| `GET /api/internships?domain=Web Development` (prod) | 200 — filtered rows | ✅ |
+| `GET /api/applications` (prod) | 200 — 4 seeded applications | ✅ |
+| `POST /api/visits/ping?source=cron` (prod) | 200 + **`stored: true`** | ✅ |
+| Dashboard in browser (prod) | Live data, "Site activity" card, 0 console errors | ✅ |
+| Keep-alive workflow run (GitHub Actions) | `conclusion: success` | ✅ |
+| Graceful DB-down state (before DB was connected) | Friendly "database not connected" card, no crash | ✅ |
+
+### 10.4 How you can re-run the checks yourself
 
 ```bash
 # API smoke test (Node 18+ has fetch)
@@ -383,14 +410,64 @@ UI: walk the app at http://localhost:3000 — apply to an internship twice, add 
 
 ---
 
-## 14. Git Workflow Used
+## 14. Live Deployment (Render + TiDB Cloud + Keep-Alive Cron)
+
+**URL:** https://internship-portal-rthh.onrender.com — deployed via the Render API, all steps scripted and repeatable.
+
+### Architecture in production
+```
+GitHub (main) ──auto-deploy──► Render web service (free, Node 22, singapore)
+                                   │  serves client/dist + REST API on one port
+                                   ▼
+                        TiDB Cloud Serverless (free, MySQL-compatible, TLS)
+                                   ▲
+GitHub Actions cron (*/5 min) ─────┘── POST /api/visits/ping?source=cron
+```
+
+### Components
+
+| Component | Choice | Why |
+|---|---|---|
+| Hosting | **Render** free web service | Hosts Node API **and** built React app as one service; auto-deploys on push to `main` |
+| Database | **TiDB Cloud Serverless** (free) | Render has no free MySQL; TiDB is MySQL-compatible, free forever, TLS-enforced |
+| Keep-alive | **GitHub Actions** cron | Free on public repos; pings every 5 min so the service never sleeps, storing a visit row each time |
+
+### Production configuration
+| Setting | Value |
+|---|---|
+| Service ID | `srv-dbri1mdg1s2s738iff0g` |
+| Region / plan | `singapore` / `free` |
+| Build / start | `npm run build` (installs server+client, builds React) / `npm start` (`node server/index.js`) |
+| Health check | `/api/health` (does not touch the DB — deploy always passes) |
+| Env vars | `DB_HOST, DB_PORT=4000, DB_USER=<id>.root, DB_PASSWORD, DB_NAME=internship_portal, DB_SSL=1, NODE_VERSION=22.11.0` — set via Render API/dashboard, **never committed** |
+| Repo variable | `RENDER_URL` = live URL, consumed by the keep-alive workflow |
+
+### How the keep-alive works (the "24/7" mechanism)
+1. `.github/workflows/keep-alive.yml` runs on schedule `*/5 * * * *` (GitHub may delay scheduled runs by a few minutes).
+2. It POSTs to `/api/visits/ping?source=cron` (3 attempts, 20 s apart, must get 200).
+3. The HTTP request itself resets Render's 15-minute idle timer → **the service stays warm**.
+4. Every ping inserts a row in `visits` → a **complete uptime record exists every 5 minutes even with zero visitors**. User visits are recorded separately by the app on page load.
+5. Totals are visible on the student Dashboard → "Site activity" card.
+
+> **Honest caveat:** Render's free tier sleeps after 15 idle minutes and GitHub cron runs are best-effort (can be delayed). In the worst case the service sleeps and wakes (~40 s) on the next ping or human visit. For a demo/college deployment this is effectively always-on; truly guaranteed uptime needs a paid plan.
+
+### Reproducing the deployment from scratch
+1. Push the repo to GitHub.
+2. In Render: create a **web service** from the repo (runtime Node, build `npm run build`, start `npm start`, health check `/api/health`) — or use [`render.yaml`](render.yaml) as a blueprint. Set the `DB_*` env vars.
+3. In TiDB Cloud: create a **Serverless** cluster → set `DB_*` env vars (TLS is auto-enabled by `config/db.js` for `*.tidbcloud.com` hosts).
+4. Load the schema: `cd server && node load-schema.js` (reads `.env`, works over TLS).
+5. Add a repository **variable** `RENDER_URL` = your onrender.com URL → the cron starts pinging automatically.
+
+---
+
+## 15. Git Workflow Used
 
 Development used **feature branches merged into `main` with `--no-ff`** (merge commits keep module history):
 
 ```
 main ──●──●──●──●──●   (merge commits)
         │  │  │  │
-        │  │  │  └─ feat/database    → schema.sql (7 tables + seed)
+        │  │  │  └─ feat/database    → schema.sql (8 tables + seed)
         │  │  └──── feat/backend-api → Express REST API, middleware, uploads
         │  └─────── feat/student-ui  → React frontend (student + admin)
         └────────── docs/readme      → README + documentation
