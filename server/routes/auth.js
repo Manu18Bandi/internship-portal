@@ -25,10 +25,10 @@ const APP_URL = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, 
 const REDIRECT_URI = `${APP_URL}/api/auth/github/callback`;
 const parseList = (s) => (s || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const ADMIN_LOGINS = parseList(process.env.ADMIN_GITHUB_LOGINS || 'Manu18Bandi');
-// Portal is private: ONLY these GitHub accounts may sign in at all.
-const ALLOWED_LOGINS = parseList(process.env.ALLOWED_GITHUB_LOGINS).length
-  ? parseList(process.env.ALLOWED_GITHUB_LOGINS)
-  : ADMIN_LOGINS;
+// Optional restriction: if ALLOWED_GITHUB_LOGINS is set, ONLY those accounts may
+// sign in. When unset (default), every GitHub account can sign in — as a
+// 'student'; logins in ADMIN_GITHUB_LOGINS get the admin panel.
+const ALLOWED_LOGINS = parseList(process.env.ALLOWED_GITHUB_LOGINS); // empty = open to all
 
 /** GET /api/auth/status — is OAuth configured? */
 router.get('/auth/status', (_req, res) => {
@@ -83,8 +83,8 @@ if (AUTH_ENABLED) {
       email = Array.isArray(emails) ? (emails.find((e) => e.primary)?.email || emails[0]?.email) : null;
     }
 
-    // 2b. portal is private — only allow-listed GitHub accounts may sign in
-    if (!ALLOWED_LOGINS.includes(ghUser.login.toLowerCase())) {
+    // 2b. optional private mode — reject accounts not on the allow-list
+    if (ALLOWED_LOGINS.length && !ALLOWED_LOGINS.includes(ghUser.login.toLowerCase())) {
       return res.redirect(`${APP_URL}/login?denied=1`);
     }
 

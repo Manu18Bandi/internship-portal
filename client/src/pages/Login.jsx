@@ -48,8 +48,8 @@ export default function Login() {
           <span className="badge-tag">Secure sign-in</span>
           <h2>Welcome back</h2>
           <p className="login-sub">
-            Use your GitHub account to continue. Access is limited to
-            authorized department accounts.
+            Sign in with your GitHub account — students get a personal
+            dashboard; department staff get the admin panel.
           </p>
 
           {denied && (
