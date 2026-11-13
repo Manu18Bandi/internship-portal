@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: internship-portal
+    runtime: node
+    plan: free
+    region: singapore          # lowest latency for India
+    branch: main
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: yes
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: DB_HOST
+        sync: false            # set in dashboard (cloud MySQL — e.g. TiDB Cloud)
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false

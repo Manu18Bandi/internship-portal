@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import api from '../api/client';
 
@@ -20,11 +20,18 @@ const NAV = [
 export default function Layout() {
   const [student, setStudent] = useState(null);
   const { pathname } = useLocation();
+  const pinged = useRef(false); // one visit ping per session (StrictMode-safe)
 
   useEffect(() => {
     api.get(`/students/${STUDENT_ID}`)
       .then((r) => setStudent(r.data.data))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (pinged.current) return;
+    pinged.current = true;
+    api.post('/visits/ping', { source: 'user' }).catch(() => {});
   }, []);
 
   const title = NAV.find((n) => n.to === pathname)?.label?.replace(/^\S+\s+/, '') || 'Internship Portal';

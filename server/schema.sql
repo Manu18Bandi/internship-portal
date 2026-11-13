@@ -103,6 +103,17 @@ CREATE TABLE certificates (
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- ------------------------------------------------------------
+-- 8. VISITS (keep-alive pings + user visit tracking)
+--    A cron pings every 5 min (source='cron') — a row exists even
+--    when zero users visited, proving continuous uptime.
+-- ------------------------------------------------------------
+CREATE TABLE visits (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  source        ENUM('cron','user') NOT NULL DEFAULT 'user',
+  visited_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 -- ============================================================
 --  SEED DATA
 -- ============================================================
