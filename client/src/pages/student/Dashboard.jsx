@@ -32,6 +32,16 @@ export default function Dashboard() {
   }, [studentId]);
 
   if (loading) return <Loader />;
+  if (!student) {
+    return (
+      <div className="card">
+        <EmptyState
+          icon="🔌"
+          text="Backend database is not connected yet. The API is running, but MySQL is unreachable — set the DB_* environment variables on the server (see PROJECT_DOCUMENTATION.md §4)."
+        />
+      </div>
+    );
+  }
 
   const stats = student.stats || {};
   const total = applications.length;
