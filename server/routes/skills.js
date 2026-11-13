@@ -9,6 +9,7 @@ const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { requireIds, requireFields, requireEnum } = require('../middleware/validate');
+const { requireSelfOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 const PROFICIENCIES = ['Beginner', 'Intermediate', 'Advanced'];
@@ -35,9 +36,10 @@ router.get('/students/:id/skills', requireIds('id'), asyncHandler(async (req, re
   res.json({ data: rows });
 }));
 
-/** POST /api/students/:id/skills — add a skill to a student */
+/** POST /api/students/:id/skills — add a skill to a student (self or admin) */
 router.post('/students/:id/skills',
   requireIds('id'),
+  requireSelfOrAdmin('id'),
   requireFields('skill_id'),
   requireEnum('proficiency', PROFICIENCIES, { optional: true }),
   asyncHandler(async (req, res) => {
@@ -62,8 +64,8 @@ router.post('/students/:id/skills',
   })
 );
 
-/** DELETE /api/students/:id/skills/:skillId */
-router.delete('/students/:id/skills/:skillId', requireIds('id', 'skillId'),
+/** DELETE /api/students/:id/skills/:skillId (self or admin) */
+router.delete('/students/:id/skills/:skillId', requireIds('id', 'skillId'), requireSelfOrAdmin('id'),
   asyncHandler(async (req, res) => {
     const result = await execute(
       'DELETE FROM student_skills WHERE student_id = ? AND skill_id = ?',

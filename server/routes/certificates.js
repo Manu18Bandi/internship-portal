@@ -11,14 +11,15 @@ const fs = require('fs');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { requireIds, requireFields } = require('../middleware/validate');
+const { requireAdmin, requireSelfOrAdmin } = require('../middleware/auth');
 const { upload, uploadDir } = require('../middleware/upload');
 
 const router = express.Router();
 
 // NOTE: mounted at /api — paths below are full resource paths.
 
-/** GET /api/students/:id/certificates */
-router.get('/students/:id/certificates', requireIds('id'), asyncHandler(async (req, res) => {
+/** GET /api/students/:id/certificates — own list (self or admin) */
+router.get('/students/:id/certificates', requireIds('id'), requireSelfOrAdmin('id'), asyncHandler(async (req, res) => {
   const rows = await query(
     `SELECT id, title, issuer, issue_date, file_path, created_at
        FROM certificates WHERE student_id = ? ORDER BY issue_date DESC`,
@@ -27,9 +28,10 @@ router.get('/students/:id/certificates', requireIds('id'), asyncHandler(async (r
   res.json({ data: rows });
 }));
 
-/** POST /api/students/:id/certificates — multipart with optional file */
+/** POST /api/students/:id/certificates — multipart with optional file (self or admin) */
 router.post('/students/:id/certificates',
   requireIds('id'),
+  requireSelfOrAdmin('id'),
   upload.single('file'),
   requireFields('title', 'issuer', 'issue_date'),
   asyncHandler(async (req, res) => {
@@ -48,10 +50,17 @@ router.post('/students/:id/certificates',
   })
 );
 
-/** GET /api/certificates/:id/file — download/preview the stored file */
+/** GET /api/certificates/:id/file — download/preview the stored file (owner or admin) */
 router.get('/certificates/:id/file', requireIds('id'), asyncHandler(async (req, res, next) => {
-  const [cert] = await query('SELECT file_path, title FROM certificates WHERE id = ?', [req.params.id]);
+  const [cert] = await query('SELECT file_path, title, student_id FROM certificates WHERE id = ?', [req.params.id]);
   if (!cert) throw new ApiError(404, `Certificate ${req.params.id} not found`);
+  if (req.auth && req.auth.role !== 'admin') {
+    const [mine] = await query(
+      'SELECT id FROM students WHERE user_id = ? AND id = ?',
+      [req.auth.uid, cert.student_id]
+    );
+    if (!mine) throw new ApiError(403, 'Not your certificate');
+  }
   if (!cert.file_path) throw new ApiError(404, 'This certificate has no attached file');
 
   const absolute = path.join(__dirname, '..', cert.file_path);
@@ -62,10 +71,17 @@ router.get('/certificates/:id/file', requireIds('id'), asyncHandler(async (req, 
   }, (err) => { if (err) next(err); });
 }));
 
-/** DELETE /api/certificates/:id — also removes file from disk */
+/** DELETE /api/certificates/:id — also removes file from disk (owner or admin) */
 router.delete('/certificates/:id', requireIds('id'), asyncHandler(async (req, res) => {
-  const [cert] = await query('SELECT file_path FROM certificates WHERE id = ?', [req.params.id]);
+  const [cert] = await query('SELECT file_path, student_id FROM certificates WHERE id = ?', [req.params.id]);
   if (!cert) throw new ApiError(404, `Certificate ${req.params.id} not found`);
+  if (req.auth && req.auth.role !== 'admin') {
+    const [mine] = await query(
+      'SELECT id FROM students WHERE user_id = ? AND id = ?',
+      [req.auth.uid, cert.student_id]
+    );
+    if (!mine) throw new ApiError(403, 'Not your certificate');
+  }
 
   await execute('DELETE FROM certificates WHERE id = ?', [req.params.id]);
 

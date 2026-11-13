@@ -9,7 +9,8 @@
 const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { requireIds, requireFields, requireEnum, assertExists } = require('../middleware/validate');
+const { requireIds, requireFields, requireEnum, assertExists, optionalNumber } = require('../middleware/validate');
+const { requireAdmin, requireSelfOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,8 +19,8 @@ const STATUSES = ['Applied', 'Under Review', 'Selected', 'Rejected', 'Completed'
 // NOTE: this router is mounted at /api — all paths below include the full
 // resource path to avoid ambiguity between nested and top-level resources.
 
-/** GET /api/applications?status= */
-router.get('/applications', asyncHandler(async (req, res) => {
+/** GET /api/applications?status= — all applications (admin only when auth is on) */
+router.get('/applications', requireAdmin, asyncHandler(async (req, res) => {
   const { status } = req.query;
   const where = status && STATUSES.includes(status) ? 'WHERE a.status = ?' : '';
   const params = status && STATUSES.includes(status) ? [status] : [];
@@ -37,8 +38,8 @@ router.get('/applications', asyncHandler(async (req, res) => {
   res.json({ data: rows });
 }));
 
-/** GET /api/students/:id/applications */
-router.get('/students/:id/applications', requireIds('id'), asyncHandler(async (req, res) => {
+/** GET /api/students/:id/applications — own list (self or admin) */
+router.get('/students/:id/applications', requireIds('id'), requireSelfOrAdmin('id'), asyncHandler(async (req, res) => {
   const rows = await query(
     `SELECT a.*, i.title AS internship_title, i.domain, i.duration_weeks, i.stipend,
             i.deadline, c.name AS company_name, c.location AS company_location
@@ -51,13 +52,16 @@ router.get('/students/:id/applications', requireIds('id'), asyncHandler(async (r
   res.json({ data: rows });
 }));
 
-/** POST /api/applications — apply to an internship */
+/** POST /api/applications — apply to an internship (session's student; admins may apply for any) */
 router.post('/applications',
-  requireFields('student_id', 'internship_id'),
-  assertExists('students', 'student_id', 'student_id'),
+  requireFields('internship_id'),
   assertExists('internships', 'internship_id', 'internship_id'),
   asyncHandler(async (req, res) => {
-    const { student_id, internship_id } = req.body;
+    // students always apply as themselves; admins may specify student_id
+    const student_id = (req.auth && req.auth.role === 'admin' && req.body.student_id)
+      ? req.body.student_id
+      : (req.auth?.sid || req.body.student_id);
+    const { internship_id } = req.body;
 
     const dup = await query(
       'SELECT id FROM applications WHERE student_id = ? AND internship_id = ?',
@@ -81,6 +85,7 @@ router.post('/applications',
 
 /** PATCH /api/applications/:id/status — admin status management */
 router.patch('/applications/:id/status',
+  requireAdmin,
   requireIds('id'),
   requireFields('status'),
   requireEnum('status', STATUSES),
@@ -95,8 +100,18 @@ router.patch('/applications/:id/status',
   })
 );
 
-/** DELETE /api/applications/:id — withdraw */
+/** DELETE /api/applications/:id — withdraw (owner or admin) */
 router.delete('/applications/:id', requireIds('id'), asyncHandler(async (req, res) => {
+  // ownership check (skipped in demo mode / for admins)
+  if (req.auth && req.auth.role !== 'admin') {
+    const [app] = await query('SELECT student_id FROM applications WHERE id = ?', [req.params.id]);
+    if (!app) throw new ApiError(404, `Application ${req.params.id} not found`);
+    const [mine] = await query(
+      'SELECT id FROM students WHERE user_id = ? AND id = ?',
+      [req.auth.uid, app.student_id]
+    );
+    if (!mine) throw new ApiError(403, 'You can only withdraw your own applications');
+  }
   const result = await execute('DELETE FROM applications WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) throw new ApiError(404, `Application ${req.params.id} not found`);
   res.json({ data: { deleted: true } });

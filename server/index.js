@@ -10,8 +10,10 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 
 const { notFound, errorHandler } = require('./middleware/error');
+const { attachSession, requireAuth, requireAdmin, requireSelfOrAdmin, AUTH_ENABLED } = require('./middleware/auth');
 const studentsRouter = require('./routes/students');
 const skillsRouter = require('./routes/skills');
 const companiesRouter = require('./routes/companies');
@@ -19,14 +21,17 @@ const internshipsRouter = require('./routes/internships');
 const applicationsRouter = require('./routes/applications');
 const certificatesModule = require('./routes/certificates');
 const visitsRouter = require('./routes/visits');
+const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ---------- global middleware ----------
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(attachSession);
 
 // Simple request logger (dev)
 app.use((req, _res, next) => {
@@ -35,14 +40,23 @@ app.use((req, _res, next) => {
 });
 
 // ---------- routes ----------
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.get('/api/health', (_req, res) => res.json({
+  status: 'ok',
+  uptime: process.uptime(),
+  auth: AUTH_ENABLED ? 'github-oauth' : 'demo-mode',
+}));
+app.use('/api', authRouter); // mounts /api/auth/* (status always; OAuth routes when configured)
+app.use('/api', visitsRouter);            // ping stays PUBLIC (cron); summary guards itself
+
+// All other data APIs require a session once OAuth is enabled (demo mode: open)
+app.use('/api', requireAuth);
+
 app.use('/api/students', studentsRouter);
 app.use('/api', skillsRouter);            // mounts /api/skills and /api/students/:id/skills
 app.use('/api/companies', companiesRouter);
 app.use('/api/internships', internshipsRouter);
 app.use('/api', applicationsRouter);      // mounts /api/applications*, /api/students/:id/applications
 app.use('/api', certificatesModule.router); // mounts /api/students/:id/certificates, /api/certificates/:id*
-app.use('/api', visitsRouter);              // mounts /api/visits/ping, /api/visits/summary
 
 // Uploaded certificate files (safe fallback; explicit file route exists too)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

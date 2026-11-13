@@ -8,6 +8,7 @@ const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { requireIds, requireFields, optionalNumber } = require('../middleware/validate');
+const { requireAdmin, requireSelfOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -49,9 +50,10 @@ router.get('/:id', requireIds('id'), asyncHandler(async (req, res) => {
   });
 }));
 
-/** PUT /api/students/:id — update editable profile fields */
+/** PUT /api/students/:id — update editable profile fields (self or admin) */
 router.put('/:id',
   requireIds('id'),
+  requireSelfOrAdmin('id'),
   requireFields('name', 'email', 'department'),
   optionalNumber('cgpa', { min: 0, max: 10 }),
   asyncHandler(async (req, res) => {

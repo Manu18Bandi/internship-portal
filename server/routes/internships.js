@@ -11,6 +11,7 @@ const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { requireIds, requireFields, optionalNumber } = require('../middleware/validate');
+const { requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -68,8 +69,9 @@ function parseDeadline(body) {
   return body.deadline;
 }
 
-/** POST /api/internships */
+/** POST /api/internships (admin only when auth is on) */
 router.post('/',
+  requireAdmin,
   requireFields('company_id', 'title', 'domain', 'deadline'),
   optionalNumber('stipend', { min: 0 }),
   optionalNumber('duration_weeks', { min: 1 }),
@@ -94,8 +96,9 @@ router.post('/',
   })
 );
 
-/** PUT /api/internships/:id */
+/** PUT /api/internships/:id (admin only when auth is on) */
 router.put('/:id',
+  requireAdmin,
   requireIds('id'),
   requireFields('title', 'domain'),
   asyncHandler(async (req, res) => {
@@ -117,8 +120,8 @@ router.put('/:id',
   })
 );
 
-/** DELETE /api/internships/:id */
-router.delete('/:id', requireIds('id'), asyncHandler(async (req, res) => {
+/** DELETE /api/internships/:id (admin only when auth is on) */
+router.delete('/:id', requireAdmin, requireIds('id'), asyncHandler(async (req, res) => {
   const result = await execute('DELETE FROM internships WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) throw new ApiError(404, `Internship ${req.params.id} not found`);
   res.json({ data: { deleted: true } });

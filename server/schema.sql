@@ -12,6 +12,7 @@ USE internship_portal;
 -- ------------------------------------------------------------
 CREATE TABLE students (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT UNSIGNED NULL,               -- linked GitHub login account
   name          VARCHAR(100)  NOT NULL,
   email         VARCHAR(150)  NOT NULL UNIQUE,
   phone         VARCHAR(20),
@@ -113,6 +114,26 @@ CREATE TABLE visits (
   source        ENUM('cron','user') NOT NULL DEFAULT 'user',
   visited_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- 9. USERS (GitHub-authenticated accounts)
+--    role: 'admin' manages companies/internships/application statuses;
+--    every user gets a linked student profile.
+-- ------------------------------------------------------------
+CREATE TABLE users (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  github_id     BIGINT UNSIGNED NOT NULL UNIQUE,
+  login         VARCHAR(100) NOT NULL,
+  name          VARCHAR(150),
+  email         VARCHAR(150),
+  avatar_url    VARCHAR(300),
+  role          ENUM('student','admin') NOT NULL DEFAULT 'student',
+  last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+ALTER TABLE students
+  ADD CONSTRAINT fk_students_user FOREIGN KEY (user_id) REFERENCES users(id);
 
 -- ============================================================
 --  SEED DATA

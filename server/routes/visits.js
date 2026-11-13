@@ -9,6 +9,7 @@
 const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler } = require('../middleware/error');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 const SOURCES = ['cron', 'user'];
@@ -29,8 +30,8 @@ router.post('/visits/ping', asyncHandler(async (req, res) => {
   res.json({ data: { ok: true, source, stored, at: new Date().toISOString() } });
 }));
 
-/** GET /api/visits/summary — totals */
-router.get('/visits/summary', asyncHandler(async (_req, res) => {
+/** GET /api/visits/summary — totals (session required when auth is on) */
+router.get('/visits/summary', requireAuth, asyncHandler(async (_req, res) => {
   try {
     const [totals] = await query(
       `SELECT

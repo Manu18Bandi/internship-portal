@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { getErr } from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/Toast';
 import Loader from '../../components/Loader';
 import EmptyState from '../../components/EmptyState';
-import { STUDENT_ID } from '../../components/Layout';
 
 export default function BrowseInternships() {
   const toast = useToast();
+  const { studentId } = useAuth();
+  const navigate = useNavigate();
   const [internships, setInternships] = useState([]);
   const [domains, setDomains] = useState([]);
   const [appliedIds, setAppliedIds] = useState(new Set());
@@ -15,10 +18,11 @@ export default function BrowseInternships() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!studentId) return;
     Promise.all([
       api.get('/internships', { params: { domain, search, open: 'true' } }),
       api.get('/internships/domains'),
-      api.get(`/students/${STUDENT_ID}/applications`),
+      api.get(`/students/${studentId}/applications`),
     ])
       .then(([list, d, apps]) => {
         setInternships(list.data.data);
@@ -27,15 +31,17 @@ export default function BrowseInternships() {
       })
       .catch((e) => toast(getErr(e, 'Could not load internships'), 'error'))
       .finally(() => setLoading(false));
-  }, [domain, search]);
+  }, [domain, search, studentId]);
 
   const apply = async (internshipId) => {
     try {
-      await api.post('/applications', { student_id: STUDENT_ID, internship_id: internshipId });
+      await api.post('/applications', { internship_id: internshipId });
       setAppliedIds(new Set([...appliedIds, internshipId]));
       toast('Application submitted ✔');
     } catch (err) {
-      toast(getErr(err), 'error');
+      const msg = getErr(err);
+      if (err?.response?.status === 401) navigate('/');
+      toast(msg, 'error');
     }
   };
 

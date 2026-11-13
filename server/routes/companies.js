@@ -10,6 +10,7 @@ const express = require('express');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
 const { requireIds, requireFields } = require('../middleware/validate');
+const { requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -29,8 +30,8 @@ router.get('/:id', requireIds('id'), asyncHandler(async (req, res) => {
   res.json({ data: row });
 }));
 
-/** POST /api/companies */
-router.post('/', requireFields('name'), asyncHandler(async (req, res) => {
+/** POST /api/companies (admin only when auth is on) */
+router.post('/', requireAdmin, requireFields('name'), asyncHandler(async (req, res) => {
   const { name, industry, location, website } = req.body;
   const result = await execute(
     'INSERT INTO companies (name, industry, location, website) VALUES (?, ?, ?, ?)',
@@ -40,8 +41,8 @@ router.post('/', requireFields('name'), asyncHandler(async (req, res) => {
   res.status(201).json({ data: created });
 }));
 
-/** PUT /api/companies/:id */
-router.put('/:id', requireIds('id'), requireFields('name'), asyncHandler(async (req, res) => {
+/** PUT /api/companies/:id (admin only when auth is on) */
+router.put('/:id', requireAdmin, requireIds('id'), requireFields('name'), asyncHandler(async (req, res) => {
   const { name, industry, location, website } = req.body;
   const result = await execute(
     'UPDATE companies SET name=?, industry=?, location=?, website=? WHERE id = ?',
@@ -52,8 +53,8 @@ router.put('/:id', requireIds('id'), requireFields('name'), asyncHandler(async (
   res.json({ data: updated });
 }));
 
-/** DELETE /api/companies/:id */
-router.delete('/:id', requireIds('id'), asyncHandler(async (req, res) => {
+/** DELETE /api/companies/:id (admin only when auth is on) */
+router.delete('/:id', requireAdmin, requireIds('id'), asyncHandler(async (req, res) => {
   const result = await execute('DELETE FROM companies WHERE id = ?', [req.params.id]);
   if (!result.affectedRows) throw new ApiError(404, `Company ${req.params.id} not found`);
   res.json({ data: { deleted: true } });

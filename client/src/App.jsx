@@ -1,5 +1,7 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './auth/AuthContext';
 import Layout from './components/Layout';
+import Login from './pages/Login';
 import Dashboard from './pages/student/Dashboard';
 import Profile from './pages/student/Profile';
 import BrowseInternships from './pages/student/BrowseInternships';
@@ -10,6 +12,24 @@ import AdminCompanies from './pages/admin/AdminCompanies';
 import AdminInternships from './pages/admin/AdminInternships';
 
 export default function App() {
+  const { authEnabled, user, loading, isAdmin } = useAuth();
+
+  if (loading) {
+    return <div className="loading" style={{ paddingTop: '30vh' }}>Loading…</div>;
+  }
+
+  // OAuth on + not signed in → login screen
+  if (authEnabled && !user) {
+    return (
+      <Routes>
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
+
+  const guardAdmin = (el) =>
+    (authEnabled && !isAdmin) ? <Navigate to="/" replace /> : el;
+
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -19,10 +39,10 @@ export default function App() {
         <Route path="/internships" element={<BrowseInternships />} />
         <Route path="/applications" element={<MyApplications />} />
         <Route path="/certificates" element={<Certificates />} />
-        {/* Admin */}
-        <Route path="/admin/applications" element={<AdminApplications />} />
-        <Route path="/admin/companies" element={<AdminCompanies />} />
-        <Route path="/admin/internships" element={<AdminInternships />} />
+        {/* Admin (role-guarded when auth is on) */}
+        <Route path="/admin/applications" element={guardAdmin(<AdminApplications />)} />
+        <Route path="/admin/companies" element={guardAdmin(<AdminCompanies />)} />
+        <Route path="/admin/internships" element={guardAdmin(<AdminInternships />)} />
         <Route path="*" element={<Dashboard />} />
       </Route>
     </Routes>
