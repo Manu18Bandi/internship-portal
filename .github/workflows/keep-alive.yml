@@ -21,7 +21,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             code=$(curl -sS -m 60 -o /tmp/ping.json -w "%{http_code}" \
-              -X POST "${{ secrets.RENDER_URL }}/api/visits/ping?source=cron" || echo "000")
+              -X POST "${{ vars.RENDER_URL }}/api/visits/ping?source=cron" || echo "000")
             echo "attempt $i → HTTP $code"; cat /tmp/ping.json || true; echo
             [ "$code" = "200" ] && exit 0
             sleep 20
