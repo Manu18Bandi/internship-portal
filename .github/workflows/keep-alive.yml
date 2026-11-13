@@ -1,0 +1,29 @@
+name: Keep-alive ping (every 5 min)
+
+# Pings the live Render service every 5 minutes so the free tier never sleeps.
+# Each ping is stored in the visits table (source='cron') — a record exists
+# even when zero users visited. Also runs on demand via workflow_dispatch.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes (GitHub may delay by a few minutes)
+  workflow_dispatch: {}      # manual run button
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping visit endpoint
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -sS -m 60 -o /tmp/ping.json -w "%{http_code}" \
+              -X POST "${{ secrets.RENDER_URL }}/api/visits/ping?source=cron" || echo "000")
+            echo "attempt $i → HTTP $code"; cat /tmp/ping.json || true; echo
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::warning::ping did not return 200 after 3 attempts"

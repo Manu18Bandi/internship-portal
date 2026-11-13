@@ -9,6 +9,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const { notFound, errorHandler } = require('./middleware/error');
 const studentsRouter = require('./routes/students');
@@ -17,6 +18,7 @@ const companiesRouter = require('./routes/companies');
 const internshipsRouter = require('./routes/internships');
 const applicationsRouter = require('./routes/applications');
 const certificatesModule = require('./routes/certificates');
+const visitsRouter = require('./routes/visits');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,9 +42,20 @@ app.use('/api/companies', companiesRouter);
 app.use('/api/internships', internshipsRouter);
 app.use('/api', applicationsRouter);      // mounts /api/applications*, /api/students/:id/applications
 app.use('/api', certificatesModule.router); // mounts /api/students/:id/certificates, /api/certificates/:id*
+app.use('/api', visitsRouter);              // mounts /api/visits/ping, /api/visits/summary
 
 // Uploaded certificate files (safe fallback; explicit file route exists too)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ---------- production: serve the built React app (client/dist) ----------
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback — any non-API GET renders the React app
+  app.get(/^\/(?!api|uploads).*/, (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // ---------- 404 + centralized error handling ----------
 app.use(notFound);

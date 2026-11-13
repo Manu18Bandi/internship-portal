@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [student, setStudent] = useState(null);
   const [applications, setApplications] = useState([]);
   const [certCount, setCertCount] = useState(0);
+  const [visits, setVisits] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,11 +20,13 @@ export default function Dashboard() {
       api.get(`/students/${studentId}`),
       api.get(`/students/${studentId}/applications`),
       api.get(`/students/${studentId}/certificates`),
+      api.get('/visits/summary'),
     ])
-      .then(([s, a, c]) => {
+      .then(([s, a, c, v]) => {
         setStudent(s.data.data);
         setApplications(a.data.data);
         setCertCount(c.data.data.length);
+        setVisits(v.data.data);
       })
       .finally(() => setLoading(false));
   }, [studentId]);
@@ -88,6 +91,24 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Site activity (keep-alive monitor) */}
+      <div className="card row">
+        <div>
+          <h3 style={{ margin: 0 }}>Site activity</h3>
+          <div className="muted small" style={{ marginTop: 6 }}>
+            A cron job pings this portal every 5 minutes and stores a visit record
+            — even with 0 visitors — so the service stays awake 24/7.
+          </div>
+        </div>
+        <div className="stack" style={{ textAlign: 'right' }}>
+          <span className="pill">👤 {visits?.user_visits ?? '—'} user visits</span>
+          <span className="pill">⏱ {visits?.cron_pings ?? '—'} keep-alive pings</span>
+          <span className="muted small">
+            {visits?.last_ping ? `last ping: ${visits.last_ping}` : visits?.db === 'unavailable' ? 'stats DB unavailable' : ''}
+          </span>
         </div>
       </div>
 
