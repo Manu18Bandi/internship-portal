@@ -8,6 +8,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
@@ -26,8 +27,48 @@ const authRouter = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.disable('x-powered-by');
+
 // ---------- global middleware ----------
-app.use(cors({ origin: true, credentials: true }));
+// Security headers (HSTS, X-Content-Type-Options, X-Frame-Options via CSP
+// frame-ancestors, Referrer-Policy, etc.). CSP allows GitHub avatars and the
+// same-origin app bundle only.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:", "https://avatars.githubusercontent.com"],
+      "connect-src": ["'self'"],
+      "font-src": ["'self'", "data:"],
+      "object-src": ["'self'"],
+      "base-uri": ["'self'"],
+      "form-action": ["'self'"],
+      "frame-ancestors": ["'none'"],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'same-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+// CORS allowlist — only origins we control may send credentialed requests.
+const allowList = [
+  process.env.APP_URL,
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+].filter(Boolean).map((u) => u.replace(/\/$/, ''));
+const corsOptions = {
+  origin(origin, cb) {
+    // non-browser tools (curl, cron) send no Origin — allow those
+    if (!origin || allowList.includes(origin)) return cb(null, true);
+    return cb(null, false); // don't reflect unknown origins
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -58,8 +99,8 @@ app.use('/api/internships', internshipsRouter);
 app.use('/api', applicationsRouter);      // mounts /api/applications*, /api/students/:id/applications
 app.use('/api', certificatesModule.router); // mounts /api/students/:id/certificates, /api/certificates/:id*
 
-// Uploaded certificate files (safe fallback; explicit file route exists too)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// NOTE: uploaded certificate files are NOT served statically. All access goes
+// through GET /api/certificates/:id/file, which enforces ownership (self/admin).
 
 // ---------- production: serve the built React app (client/dist) ----------
 const clientDist = path.join(__dirname, '..', 'client', 'dist');

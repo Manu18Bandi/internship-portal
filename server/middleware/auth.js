@@ -11,6 +11,14 @@ const { query } = require('../config/db');
 
 const AUTH_ENABLED = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 
+// Fail closed: with OAuth enabled, refusing to start without a real JWT secret
+// is far safer than silently falling back to a guessable dev value (which would
+// let anyone forge session cookies, including admin sessions).
+const JWT_SECRET = process.env.JWT_SECRET;
+if (AUTH_ENABLED && !JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set when GitHub OAuth is enabled');
+}
+
 const COOKIE_NAME = 'portal_session';
 
 function readToken(req) {
@@ -23,7 +31,7 @@ function decodeSession(req) {
   const token = readToken(req);
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    return jwt.verify(token, JWT_SECRET);
   } catch {
     return null;
   }
@@ -85,4 +93,4 @@ const requireSelfOrAdmin = (idParam = 'id') =>
     next();
   });
 
-module.exports = { AUTH_ENABLED, COOKIE_NAME, attachSession, requireAuth, requireAdmin, requireSelfOrAdmin };
+module.exports = { AUTH_ENABLED, JWT_SECRET, COOKIE_NAME, attachSession, requireAuth, requireAdmin, requireSelfOrAdmin };

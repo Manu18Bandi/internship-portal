@@ -15,7 +15,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { query, execute } = require('../config/db');
 const { asyncHandler, ApiError } = require('../middleware/error');
-const { AUTH_ENABLED, COOKIE_NAME } = require('../middleware/auth');
+const { AUTH_ENABLED, JWT_SECRET, COOKIE_NAME } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -128,7 +128,7 @@ if (AUTH_ENABLED) {
     // 5. issue the session cookie
     const token = jwt.sign(
       { uid: user.id, login: user.login, role: user.role, sid: student.id },
-      process.env.JWT_SECRET || 'dev-secret',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.cookie(COOKIE_NAME, token, {

@@ -18,10 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping visit endpoint
+        env:
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
         run: |
           for i in 1 2 3; do
-            code=$(curl -sS -m 60 -o /tmp/ping.json -w "%{http_code}" \
-              -X POST "${{ vars.RENDER_URL }}/api/visits/ping?source=cron" || echo "000")
+            url="${{ vars.RENDER_URL }}/api/visits/ping?source=cron"
+            [ -n "$CRON_TOKEN" ] && url="${url}&token=${CRON_TOKEN}"
+            code=$(curl -sS -m 60 -o /tmp/ping.json -w "%{http_code}" -X POST "$url" || echo "000")
             echo "attempt $i → HTTP $code"; cat /tmp/ping.json || true; echo
             [ "$code" = "200" ] && exit 0
             sleep 20

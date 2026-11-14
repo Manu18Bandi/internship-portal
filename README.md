@@ -94,7 +94,7 @@ Built with **React + Node.js/Express + MySQL**, in a clean 4-color white theme.
 
 ## 📖 How to Use the App
 
-Open the live URL (or `http://localhost:3000` locally). The app has no login — it opens on the demo student's dashboard.
+Open the live URL (or `http://localhost:3000` locally). When GitHub OAuth is configured you sign in with GitHub (allowed accounts only); otherwise the app opens straight onto the demo student's dashboard.
 
 ### As a student
 1. **Dashboard** — see your profile, counts of applications/skills/certificates, status breakdown, and recent applications
@@ -150,9 +150,14 @@ MAX_UPLOAD_MB=5
 # GitHub OAuth (optional — omit to run in demo mode with no login)
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
-JWT_SECRET=              # any long random string
+JWT_SECRET=              # required when OAuth is enabled (server won't start without it)
 APP_URL=http://localhost:3000
 ADMIN_GITHUB_LOGINS=Manu18Bandi
+# Optional: allow-list of GitHub logins permitted to sign in (empty = open to all)
+ALLOWED_GITHUB_LOGINS=
+# Optional: shared secret for cron pings — set the same value as a CRON_TOKEN
+# secret on the GitHub repo so the keep-alive workflow authenticates
+CRON_TOKEN=
 ```
 
 **GitHub OAuth setup (to enable login):**
@@ -256,13 +261,16 @@ All checks were executed for real (full details & results: [`PROJECT_DOCUMENTATI
 
 ## 🔐 Security
 
+- **Authentication** → GitHub OAuth + JWT session (httpOnly, SameSite=Lax, secure in prod); role guards (`admin` / `student`) and self-or-admin ownership checks on every data route. `JWT_SECRET` is **fail-closed** — the server refuses to start with OAuth enabled but no secret set
+- **Security headers** → Helmet: CSP (self-only scripts, GitHub avatars whitelisted), HSTS, `X-Content-Type-Options`, `X-Frame-Options`, Referrer-Policy; `x-powered-by` disabled
+- **CORS** → strict allowlist (app URL + local dev ports); unknown origins are not reflected, credentials never leak cross-origin
+- **Uploaded certificates** → served **only** via `GET /api/certificates/:id/file` with ownership enforcement; MIME whitelist + 5 MB cap + sanitized randomized filenames. No static `/uploads` route
+- **Cron ping** → when `CRON_TOKEN` is set (Render + GitHub secret), cron pings must present the matching token (`?token=`); user pings remain open
 - **SQL injection** → 100% parameterized queries (mysql2)
-- **Malicious uploads** → MIME whitelist + 5 MB cap + sanitized randomized filenames
 - **Bad input** → validation middleware on every write route (required fields, enums, ranges, FK existence)
-- **XSS** → React auto-escaping; no `dangerouslySetInnerHTML`
+- **XSS** → React auto-escaping; no `dangerouslySetInnerHTML`; CSP `script-src 'self'`
 - **Secrets** → `.env` gitignored; production credentials only in Render's encrypted env vars
 - **Error leakage** → generic 500 messages; SQL details only in dev
-- ⚠️ **Scope decision:** no authentication (single demo student + open admin, per requirements) — add JWT/session auth before any real-world use. See PROJECT_DOCUMENTATION.md §11 for the full analysis.
 
 ---
 

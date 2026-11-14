@@ -14,10 +14,19 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 const SOURCES = ['cron', 'user'];
 
+// Optional hardening: when CRON_TOKEN is set (server env), cron-sourced pings
+// must present a matching ?token= value (GitHub Actions passes it via the
+// CRON_TOKEN secret). User pings stay open — the browser holds no secrets.
+const CRON_TOKEN = process.env.CRON_TOKEN || '';
+
 /** POST /api/visits/ping — record one visit */
 router.post('/visits/ping', asyncHandler(async (req, res) => {
   const source = SOURCES.includes(req.query.source) ? req.query.source
     : SOURCES.includes(req.body?.source) ? req.body.source : 'user';
+
+  if (CRON_TOKEN && source === 'cron' && req.query.token !== CRON_TOKEN) {
+    return res.status(401).json({ error: { message: 'Invalid cron token' } });
+  }
 
   let stored = false;
   try {
